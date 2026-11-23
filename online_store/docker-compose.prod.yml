@@ -1,0 +1,49 @@
+# Production overrides:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Only Nginx publishes a port. Terminate TLS in front of it (see README "Production deployment").
+
+x-prod-logging: &prod-logging
+  logging:
+    driver: json-file
+    options: { max-size: "20m", max-file: "5" }
+
+services:
+  postgres:
+    <<: *prod-logging
+    restart: always
+  redis:
+    <<: *prod-logging
+    restart: always
+  migrate:
+    environment:
+      ENVIRONMENT: production
+  api:
+    <<: *prod-logging
+    restart: always
+    command:
+      - uvicorn
+      - app.main:app
+      - --host=0.0.0.0
+      - --port=8000
+      - --workers=${API_WORKERS:-2}
+      - --proxy-headers
+      - --forwarded-allow-ips=*
+      - --no-server-header
+    environment:
+      ENVIRONMENT: production
+  bot:
+    <<: *prod-logging
+    restart: always
+    environment:
+      ENVIRONMENT: production
+  worker:
+    <<: *prod-logging
+    restart: always
+    environment:
+      ENVIRONMENT: production
+  frontend:
+    <<: *prod-logging
+    restart: always
+  nginx:
+    <<: *prod-logging
+    restart: always

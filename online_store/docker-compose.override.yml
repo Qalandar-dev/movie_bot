@@ -1,0 +1,54 @@
+# Development overrides (loaded automatically by `docker compose up`).
+# Hot reload for API and frontend; Postgres/Redis/API published on localhost only.
+
+x-backend-dev: &backend-dev
+  build:
+    context: ./backend
+    target: dev
+  image: online-store-backend:dev
+
+services:
+  postgres:
+    ports: ["127.0.0.1:5432:5432"]
+  redis:
+    ports: ["127.0.0.1:6379:6379"]
+  migrate:
+    <<: *backend-dev
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/alembic.ini:/app/alembic.ini
+  api:
+    <<: *backend-dev
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/alembic.ini:/app/alembic.ini
+      - media:/app/media
+    ports: ["127.0.0.1:8000:8000"]
+  bot:
+    <<: *backend-dev
+    # Without BOT_TOKEN the bot logs an error and exits; don't restart-loop in dev.
+    restart: on-failure:3
+    volumes:
+      - ./backend/app:/app/app
+  worker:
+    <<: *backend-dev
+    volumes:
+      - ./backend/app:/app/app
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    image: online-store-frontend:dev
+    environment:
+      API_PROXY_TARGET: http://api:8000
+      WATCHPACK_POLLING: "true"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      interval: 15s
+      timeout: 10s
+      start_period: 90s
+      retries: 5
